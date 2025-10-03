@@ -1,0 +1,160 @@
+# Coding Principles
+
+*Modeled on the “Clean Code” philosophy popularised by Robert C. Martin and widely adopted across the industry.*
+
+This document defines the core coding principles that every contributor **MUST** follow when working on **Project Metrics Tool**.  The goals are the same for every code change:
+
+*   **Readability** – code is written **for humans first, for machines second**.
+*   **Maintainability** – changes should be easy, safe and inexpensive to make.
+*   **Correctness** – behaviour is clearly expressed and guarded by tests.
+*   **Simplicity** – the simplest solution that solves the problem is preferred.
+
+Following these principles keeps development velocity high and prevents _technical debt_ from creeping in.
+
+---
+
+## 1  General Philosophy
+
+> *“Clean code always looks like it was written by someone who cares.”*  — Michael Feathers
+
+1.  **Leave the campground cleaner than you found it.**  Whenever you touch a file, take the extra minute to improve its clarity.
+2.  **Boy-Scout Rule.**  Small, incremental clean-ups are better than large refactors done rarely.
+3.  **Small Steps.**  Make frequent, small, atomic commits.  Each commit should pass all tests.
+4.  **YAGNI.**  Don’t add functionality until it is _actually_ needed.
+5.  **KISS.**  Prefer the simplest solution that satisfies the requirements—avoid cleverness.
+6.  **Fail Fast & Loud.**  Let errors surface early; don’t hide them.
+
+---
+
+## 2  Naming
+
+| Bad | Good |
+|-----|------|
+| `d` | `days_since_start` |
+| `calculate` | `compute_average_velocity` |
+
+1.  Use **intention-revealing names**.  The reader should not need additional context to grasp a symbol’s purpose.
+2.  **Pronounceable & searchable.**  Names appear in conversations, code reviews and grep searches.
+3.  **Avoid prefixes and Hungarian notation** (`strName`, `iCount`).  Let the type system and context speak for themselves.
+4.  Use **domain language** where appropriate—e.g., “sprint”, “issue”, “cycle time”.
+
+---
+
+## 3  Functions & Methods
+
+1.  **Do one thing, do it well.**  If a function needs a verb in its name _and_ another verb in its description, it probably does too much.
+2.  **Short.**  Prefer ≤ 20 lines.  Break logic into well-named private helpers.
+3.  **Few arguments.**  Three is the practical maximum; use parameter objects or named tuples if more data is needed.
+4.  **No side effects unless explicitly stated.**  Pure functions are easier to test and reason about.
+5.  **Command–Query Separation (CQS).**  Functions either change state (commands) *or* return data (queries) — never both.
+
+---
+
+## 4  SOLID Principles
+
+The **SOLID** principles are five foundational guidelines for designing maintainable, extensible, and robust software. Every contributor should strive to apply these principles when writing or refactoring code in Project Metrics Tool.
+
+**S** – *Single Responsibility Principle (SRP)*  
+> *A module, class, or function should have one, and only one, reason to change.*
+
+- Each class or function should encapsulate a single concept or responsibility.
+- If you find yourself adding “and” or “or” to a function’s description, split it up.
+- Example: Don’t mix data parsing and validation in the same function.
+
+**O** – *Open/Closed Principle (OCP)*  
+> *Software entities should be open for extension, but closed for modification.*
+
+- Add new functionality by extending code (e.g., via subclassing, composition, or plugins), not by modifying existing, stable code.
+- Use abstract base classes or protocols for extensibility.
+- Example: To support a new data source, add a new module/class rather than editing core logic.
+
+**L** – *Liskov Substitution Principle (LSP)*  
+> *Subtypes must be substitutable for their base types without altering correctness.*
+
+- Derived classes or implementations must honor the contract of their base class/interface.
+- Never override a method to do less or break expected behavior.
+- Example: If a function expects a `DataSource`, any subclass must work as a drop-in replacement.
+
+**I** – *Interface Segregation Principle (ISP)*  
+> *Clients should not be forced to depend on interfaces they do not use.*
+
+- Prefer small, focused interfaces or protocols over large, monolithic ones.
+- Split up classes/interfaces if they grow too many unrelated methods.
+- Example: Separate “export” and “import” interfaces if not all data sources support both.
+
+**D** – *Dependency Inversion Principle (DIP)*  
+> *Depend on abstractions, not on concrete implementations.*
+
+- High-level modules should not depend on low-level modules; both should depend on abstractions.
+- Use dependency injection (passing dependencies as arguments) where practical.
+- Example: Pass a logger or HTTP client as a parameter, not as a hardcoded global.
+
+**How to apply SOLID in this project:**
+- When adding new features, ask: “Am I violating any SOLID principle?”
+- Refactor code that mixes responsibilities or is hard to extend.
+- Use Python’s abstract base classes, protocols, or duck typing to define clear contracts.
+- Keep interfaces and classes focused and minimal.
+- Prefer composition and dependency injection over hardcoded dependencies.
+
+For more, see: [SOLID Principles Wikipedia](https://en.wikipedia.org/wiki/SOLID)
+
+---
+
+
+## 5  Comments
+
+1.  **Code should explain *what*, comments explain *why*.**  Don’t restate the obvious.
+2.  **Keep comments up-to-date** or delete them.
+3.  Always document public modules / classes using format proper for the language used  
+4.  Write TODOs in the form `# TODO(username): <action> <context>` and create a matching task in /tasks folder
+
+---
+
+## 6  Error Handling
+
+1.  **Exceptions over sentinel values.**  Never return `None`/`-1` to indicate errors.
+2.  **Provide context** in exception messages (identifiers, parameters, environment details).
+3.  **Fail early**, validate arguments at the boundary.
+4.  **Don’t catch what you can’t handle.**  Let it bubble up.
+5.  **NEVER return raw object from internal scope of function - like http results** if error occurs - throw exception instead of returning respo
+
+---
+
+## 7  Data & Control Structures
+
+1.  **Prefer composition over inheritance.**  Use mixins/delegation to share behaviour.
+2.  Stick to **standard library containers** (e.g., lists, dictionaries, sets) unless there’s a clear benefit.
+3.  Expose behaviour through methods, **not through public attributes**.
+4.  Don’t expose mutable internals; return copies or iterators.
+
+---
+
+## 8  Concurrency
+
+1.  Share **immutable data** across threads/processes.
+2.  Protect shared mutable state with locks or queues; prefer higher-level abstractions (e.g., futures, message queues).
+3.  When using asynchronous runtimes, keep operations short and non-blocking.
+
+---
+
+## 9  Code Review Checklist
+
+Before approving a pull request, ensure:
+
+* [ ] The code follows principles in this document.
+* [ ] All tests pass locally and in CI.
+* [ ] New/changed code has sufficient tests.
+* [ ] Public APIs are documented.
+* [ ] No new warnings or linter errors are introduced.
+
+---
+
+## 10  Reference Material
+
+* *Clean Code: A Handbook of Agile Software Craftsmanship* — Robert C. Martin
+* *The Pragmatic Programmer* — Hunt & Thomas
+
+---
+
+*Last updated: <!-- YYYY-MM-DD; keep ISO 8601 format --> 2025-08-04
+

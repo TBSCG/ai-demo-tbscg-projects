@@ -1,0 +1,28 @@
+# Technical Decisions Document
+## Project Management Web Application
+
+---
+
+## 1. Overview
+
+This document outlines the technology stack and architectural decisions for the project management web application. The stack prioritizes modern development practices, type safety, performance, and developer experience.
+
+---
+
+## 2. Technology Stack Summary
+
+| Category | Technology | Version |
+|----------|-----------|---------|
+| Runtime | Node.js | LTS 22.18.0 |
+| Package Manager | NPM | 10.2.0 |
+| Frontend Framework | React | 19.1.1 |
+| Frontend Language | TypeScript | 5.9 |
+| Build Tool | Vite | 7.0 |
+| Backend Framework | Express.js | 5.0.0 |
+| Backend Language | TypeScript | 5.9 |
+| Database | PostgreSQL | 18.0 |
+| ORM | Drizzle ORM | Latest |
+| Styling | Tailwind CSS | 3.4.11 |
+| Component Styling | CSS Modules | Built-in |
+| Code Quality | ESLint | Latest |
+| Deployment | Local | N/A |
