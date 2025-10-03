@@ -5,6 +5,7 @@
   "main": "types/index.ts",
   "types": "types/index.ts",
   "scripts": {
+    "build": "echo 'No build needed for shared types'",
     "type-check": "tsc --noEmit",
     "lint": "echo 'No linting configured for shared types'"
   },
