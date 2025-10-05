@@ -1,54 +1,89 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import projectsRouter from './routes/projects.routes';
+import { errorHandler } from './middleware/errorHandler';
+import { notFoundHandler } from './middleware/notFound';
+import { requestLogger } from './utils/logger';
+import { db, closeDatabase } from './db/config';
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
+// ============================================
+// MIDDLEWARE
+// ============================================
+
+// CORS - Allow frontend origin
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+}));
+
+// JSON body parser
 app.use(express.json());
 
-// Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ success: true, message: 'Server is running' });
-});
+// URL-encoded body parser
+app.use(express.urlencoded({ extended: true }));
 
-// API routes placeholder
-app.get('/api', (_req: Request, res: Response) => {
+// Request logger (must be after body parsers)
+app.use(requestLogger);
+
+// ============================================
+// ROUTES
+// ============================================
+
+// Health check endpoint
+app.get('/health', (_req, res) => {
   res.json({
     success: true,
-    message: 'Project Management API v1.0',
-    endpoints: {
-      projects: '/api/projects',
-      health: '/health',
-    },
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
   });
 });
 
-// 404 handler
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: 'Route not found',
-  });
-});
+// API routes
+app.use('/api/projects', projectsRouter);
 
-// Error handler
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    success: false,
-    error: 'Internal server error',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined,
-  });
-});
+// 404 handler (must be after all routes)
+app.use(notFoundHandler);
 
-app.listen(PORT, () => {
+// Global error handler (must be last)
+app.use(errorHandler);
+
+// ============================================
+// SERVER STARTUP
+// ============================================
+
+const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📚 API documentation: http://localhost:${PORT}/api`);
+  console.log(`📊 Database connected: ${db ? '✓' : '✗'}`);
+  console.log(`🌍 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(async () => {
+    console.log('HTTP server closed');
+    await closeDatabase();
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('\nSIGINT signal received: closing HTTP server');
+  server.close(async () => {
+    console.log('HTTP server closed');
+    await closeDatabase();
+    process.exit(0);
+  });
+});
+
+export default app;
 
 
