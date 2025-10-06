@@ -1,18 +1,24 @@
-export default [
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      ecmaVersion: 2022,
-      sourceType: 'module',
-      parserOptions: {
-        project: './tsconfig.json',
-      },
-    },
+    extends: [
+      ...tseslint.configs.recommended,
+    ],
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },
-];
+  {
+    // Relax rules for test files
+    files: ['**/*.test.ts', '**/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  }
+);
 
 

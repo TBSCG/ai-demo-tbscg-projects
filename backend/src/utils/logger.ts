@@ -10,7 +10,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
   // Store the original res.json to intercept it
   const originalJson = res.json.bind(res);
   
-  res.json = (body: any) => {
+  res.json = (body: unknown) => {
     const duration = Date.now() - start;
     const timestamp = new Date().toISOString();
     
