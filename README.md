@@ -1,5 +1,7 @@
 # Project Management Web Application
 
+![Backend Tests](https://github.com/YOUR_USERNAME/demo-tbscg-projects/actions/workflows/backend-tests.yml/badge.svg)
+
 A modern web application for organizing and managing projects with detailed information, roadmaps, and team members.
 
 ## Tech Stack
@@ -138,6 +140,46 @@ The application will be available at:
 - `npm run build --workspace=backend` - Build TypeScript to JavaScript
 - `npm run start --workspace=backend` - Run production build
 - `npm run lint --workspace=backend` - Lint backend code
+- `npm run test --workspace=backend` - Run unit tests
+- `npm run test:watch --workspace=backend` - Run tests in watch mode
+- `npm run test:coverage --workspace=backend` - Run tests with coverage report
+- `npm run test:ui --workspace=backend` - Run tests with Vitest UI
+
+## Testing
+
+### Backend Tests
+
+The backend has comprehensive unit tests with **85% coverage** (exceeds 80% requirement).
+
+**Run tests:**
+```bash
+npm run test --workspace=backend              # Run all tests
+npm run test:watch --workspace=backend        # Watch mode
+npm run test:coverage --workspace=backend     # With coverage report
+```
+
+**Test coverage:**
+- 118 unit tests across 11 test files
+- Validators: 35 tests
+- Utils: 22 tests  
+- Middleware: 22 tests
+- Database queries: 25 tests
+- Controllers: 14 tests
+
+**Coverage thresholds (enforced):**
+- Lines: 80%
+- Functions: 80%
+- Branches: 80%
+- Statements: 80%
+
+### CI/CD
+
+GitHub Actions automatically runs tests on:
+- Every push to `master`, `main`, or `develop`
+- Every pull request
+- Tests run on Node.js 20.x and 22.x
+- Coverage reports uploaded to Codecov
+- PR comments with coverage changes
 
 ## Development Workflow
 
@@ -145,7 +187,8 @@ The application will be available at:
 2. **Hot Reload**: Changes are automatically reflected (both frontend and backend)
 3. **Type Check**: Run `npm run type-check` to verify TypeScript
 4. **Lint**: Run `npm run lint` to check code quality
-5. **Test**: Test functionality in the browser and with API calls
+5. **Test**: Run `npm run test --workspace=backend` for backend tests
+6. **Coverage**: Ensure tests maintain >80% coverage
 
 ## API Documentation
 
