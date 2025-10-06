@@ -1,3 +1,10 @@
+---
+title: 
+description: 
+globs: 
+alwaysApply: true
+---
+
 # Functional Requirements Document
 ## Project Management Web Application
 
@@ -281,4 +288,3 @@ The application will be considered successful if:
 - **Version**: 1.0
 - **Created**: October 3, 2025
 - **Last Updated**: October 3, 2025
-

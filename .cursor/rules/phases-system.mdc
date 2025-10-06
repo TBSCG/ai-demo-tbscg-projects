@@ -1,0 +1,464 @@
+---
+title: Project Phases System
+description: How project phases work including roadmap display, phase management, CRUD operations, ordering, status lifecycle, and timeline visualization
+globs: 
+alwaysApply: false
+---
+
+# Project Phases System
+**Complete Guide to Roadmap Phases Management**
+
+---
+
+## Overview
+
+Phases represent the roadmap/timeline segments of a project. They define the sequential steps or stages that a project goes through from start to completion. Each project can have zero or more phases, displayed as a visual timeline.
+
+**Key Concepts**:
+- Phases belong to a single project (1-to-many relationship)
+- Phases are ordered sequentially using an `order` field
+- Phases have a status lifecycle: planned → in-progress → completed
+- Deleting a project cascades to delete all its phases
+- Phases can overlap in dates (flexible timeline)
+
+---
+
+## Data Model
+
+### Phase Entity Structure
+
+```typescript
+Phase {
+  id: uuid (PK)                    // Unique identifier
+  projectId: uuid (FK)             // Parent project (CASCADE on delete)
+  name: string (required)          // Phase name/title (max 255 chars)
+  description: string | null       // Optional description (max 2000 chars)
+  startDate: string | null         // ISO date: YYYY-MM-DD
+  endDate: string | null           // ISO date: YYYY-MM-DD
+  status: string | null            // 'planned' | 'in-progress' | 'completed'
+  order: number (required)         // Sequence number (1, 2, 3...)
+  createdAt: timestamp             // Creation timestamp
+  updatedAt: timestamp             // Last update timestamp (backend only)
+}
+```
+
+### Database Schema (PostgreSQL)
+
+```sql
+CREATE TABLE phases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  start_date DATE,
+  end_date DATE,
+  status VARCHAR(50) DEFAULT 'planned',
+  "order" INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+);
+```
+
+**Key Constraints**:
+- `projectId` must reference valid project (foreign key)
+- `name` is required (NOT NULL)
+- Cascading delete: deleting project removes all phases
+- `order` must be non-negative integer
+
+---
+
+## Phase Ordering System
+
+### How Order Works
+
+Phases are displayed sequentially based on the `order` field (ascending):
+- Order values: 1, 2, 3, 4, 5...
+- Lower numbers appear first in timeline
+- No automatic re-ordering when deleting phases
+- Frontend sorts by order before display
+
+### Auto-Increment Logic (Backend)
+
+When creating a new phase without specifying order:
+
+```typescript
+// backend/src/db/queries/phases.queries.ts
+if (order === undefined || order === 0) {
+  const existingPhases = await getPhasesByProjectId(projectId);
+  order = existingPhases.length > 0 
+    ? Math.max(...existingPhases.map(p => p.order)) + 1 
+    : 1;
+}
+```
+
+**Behavior**:
+- If no order provided → calculate next available order
+- Find max order in existing phases
+- Set new phase order to `max + 1`
+- First phase defaults to order = 1
+
+### Frontend Order Calculation
+
+```typescript
+// frontend/src/pages/EditProjectPage.tsx
+const nextOrder = project?.phases.length 
+  ? Math.max(...project.phases.map(p => p.order)) + 1 
+  : 1;
+```
+
+---
+
+## Phase Status Lifecycle
+
+### Status Values
+
+| Status | Meaning | Badge Color | Use Case |
+|--------|---------|-------------|----------|
+| `null` or empty | Not set | Gray (default) | Status tracking not needed |
+| `'planned'` | Future work | Gray | Work scheduled but not started |
+| `'in-progress'` | Active | Yellow/Orange | Currently working on this phase |
+| `'completed'` | Finished | Green | Work is done |
+
+### Status Transitions
+
+```
+null/planned → in-progress → completed
+     ↓             ↓              ↓
+ (can go back to any status - no enforcement)
+```
+
+**Note**: Status transitions are not enforced. Users can set any status at any time.
+
+---
+
+## Backend Implementation
+
+### API Endpoints
+
+```
+POST   /api/projects/:id/phases              Create phase
+PUT    /api/projects/:id/phases/:phaseId     Update phase
+DELETE /api/projects/:id/phases/:phaseId     Delete phase
+GET    /api/projects/:id                     Get project with phases
+```
+
+### Validation Rules (Zod)
+
+**Create/Update Phase**:
+```typescript
+{
+  name: string (1-255 chars, required)
+  description: string (max 2000 chars, optional)
+  startDate: YYYY-MM-DD format (optional)
+  endDate: YYYY-MM-DD format (optional, must be >= startDate)
+  status: 'planned' | 'in-progress' | 'completed' (optional)
+  order: integer >= 0 (required for create)
+}
+```
+
+**Cross-Field Validation**:
+- If both dates provided: `endDate >= startDate`
+- `projectId` must exist (checked in controller)
+
+### Database Operations
+
+**Create Phase**:
+```typescript
+// controllers/projects.controller.ts
+export const addPhase = async (req, res) => {
+  const { id: projectId } = req.params;
+  const phaseData = req.body;
+  
+  // 1. Verify project exists
+  const exists = await projectExists(projectId);
+  if (!exists) throw new NotFoundError('Project not found');
+  
+  // 2. Create phase (auto-increments order if not provided)
+  const newPhase = await createPhase({ ...phaseData, projectId });
+  
+  // 3. Return created phase
+  res.status(201).json({ success: true, data: newPhase });
+};
+```
+
+**Update Phase**:
+```typescript
+export const updatePhase = async (req, res) => {
+  const { id: projectId, phaseId } = req.params;
+  const updates = req.body;
+  
+  // 1. Verify phase exists and belongs to project
+  const phase = await getPhaseByIdAndProjectId(phaseId, projectId);
+  if (!phase) throw new NotFoundError('Phase not found');
+  
+  // 2. Update phase
+  const updated = await updatePhase(phaseId, updates);
+  
+  // 3. Return updated phase
+  res.status(200).json({ success: true, data: updated });
+};
+```
+
+**Delete Phase**:
+```typescript
+export const deletePhase = async (req, res) => {
+  const { id: projectId, phaseId } = req.params;
+  
+  // 1. Verify phase exists and belongs to project
+  const phase = await getPhaseByIdAndProjectId(phaseId, projectId);
+  if (!phase) throw new NotFoundError('Phase not found');
+  
+  // 2. Delete phase
+  await deletePhase(phaseId);
+  
+  // 3. Return success message
+  res.status(200).json({ 
+    success: true, 
+    data: { message: 'Phase deleted successfully' } 
+  });
+};
+```
+
+---
+
+## Frontend Implementation
+
+### Read Mode (Display Only)
+
+**Component**: `PhaseTimeline.tsx`
+
+**Purpose**: Visual timeline display on project detail page
+
+**Key Features**:
+- Automatically sorts phases by `order` (ascending)
+- Displays phases as vertical timeline with connector lines
+- Shows phase number (order) in orange circle
+- Color-coded status badges
+- Date range formatting
+- Empty state when no phases
+
+**Display Logic**:
+```typescript
+// Sort phases by order
+const sortedPhases = [...phases].sort((a, b) => a.order - b.order);
+
+// Map status to badge color
+const getStatusVariant = (status) => {
+  switch (status) {
+    case 'completed': return 'success';      // Green
+    case 'in-progress': return 'warning';    // Yellow/Orange
+    default: return 'default';               // Gray
+  }
+};
+```
+
+**Visual Structure**:
+```
+┌─────────────────────────────────────┐
+│  1  Phase Name        [STATUS]      │
+│     Description text                │
+│     📅 Jan 1 - Mar 31, 2025        │
+└─────────────────────────────────────┘
+      │ (connector line)
+┌─────────────────────────────────────┐
+│  2  Phase Name        [STATUS]      │
+│     Description text                │
+│     📅 Apr 1 - Jun 30, 2025        │
+└─────────────────────────────────────┘
+```
+
+### Edit Mode (Management Interface)
+
+**Component**: `EditProjectPage.tsx`
+
+**Purpose**: Full CRUD interface for managing phases
+
+**State Management**:
+```typescript
+const [isPhaseModalOpen, setIsPhaseModalOpen] = useState(false);
+const [editingPhase, setEditingPhase] = useState<Phase | null>(null);
+const [phaseFormData, setPhaseFormData] = useState<CreatePhaseDto>({
+  name: '',
+  description: '',
+  startDate: null,
+  endDate: null,
+  status: 'planned',
+  order: 1,
+});
+```
+
+### Phase Operations
+
+#### 1. Create New Phase
+
+```typescript
+const handleOpenPhaseModal = (phase?: Phase) => {
+  if (!phase) {
+    // Create mode
+    setEditingPhase(null);
+    const nextOrder = project?.phases.length 
+      ? Math.max(...project.phases.map(p => p.order)) + 1 
+      : 1;
+    setPhaseFormData({
+      name: '',
+      description: '',
+      startDate: null,
+      endDate: null,
+      status: 'planned',
+      order: nextOrder,  // Auto-calculated
+    });
+  }
+  setIsPhaseModalOpen(true);
+};
+
+const handleSavePhase = async () => {
+  // Validate
+  if (!phaseFormData.name?.trim()) {
+    setError('Phase name is required');
+    return;
+  }
+  
+  // Create via API
+  const created = await projectsApi.phases.create(projectId, phaseFormData);
+  
+  // Update local state
+  setProject(prev => prev ? {
+    ...prev,
+    phases: [...prev.phases, created]
+  } : null);
+  
+  setIsPhaseModalOpen(false);
+  setSuccess('Phase added successfully!');
+};
+```
+
+#### 2. Update Existing Phase
+
+```typescript
+const handleOpenPhaseModal = (phase: Phase) => {
+  // Edit mode
+  setEditingPhase(phase);
+  setPhaseFormData({
+    name: phase.name,
+    description: phase.description,
+    startDate: phase.startDate,
+    endDate: phase.endDate,
+    status: phase.status,
+    order: phase.order,
+  });
+  setIsPhaseModalOpen(true);
+};
+
+const handleSavePhase = async () => {
+  if (editingPhase) {
+    // Update via API
+    const updated = await projectsApi.phases.update(
+      projectId, 
+      editingPhase.id, 
+      phaseFormData
+    );
+    
+    // Update local state (replace in array)
+    setProject(prev => prev ? {
+      ...prev,
+      phases: prev.phases.map(p => 
+        p.id === editingPhase.id ? updated : p
+      )
+    } : null);
+    
+    setSuccess('Phase updated successfully!');
+  }
+  setIsPhaseModalOpen(false);
+};
+```
+
+#### 3. Delete Phase
+
+```typescript
+const handleDeletePhase = async (phaseId: string) => {
+  // Confirm with user
+  if (!confirm('Are you sure you want to delete this phase?')) return;
+  
+  // Delete via API
+  await projectsApi.phases.delete(projectId, phaseId);
+  
+  // Update local state (remove from array)
+  setProject(prev => prev ? {
+    ...prev,
+    phases: prev.phases.filter(p => p.id !== phaseId)
+  } : null);
+  
+  setSuccess('Phase deleted successfully!');
+};
+```
+
+---
+
+## Common Patterns
+
+### Loading Phases with Project
+
+Phases are always loaded together with the project:
+
+```typescript
+// Frontend
+const project = await projectsApi.getById(projectId);
+// Returns: { ...projectData, phases: [...phasesData] }
+
+// Backend
+const project = await getProjectByIdWithPhases(projectId);
+// Fetches project, then fetches phases, combines into one object
+```
+
+### Sorting Phases
+
+Always sort by `order` before display:
+
+```typescript
+const sortedPhases = [...phases].sort((a, b) => a.order - b.order);
+```
+
+### Empty State Handling
+
+```typescript
+if (phases.length === 0) {
+  return <EmptyState message="No phases yet. Add your first phase." />;
+}
+```
+
+---
+
+## Edge Cases and Considerations
+
+### 1. Orphaned Phases
+**Not Possible**: Foreign key with CASCADE delete ensures phases are removed when project is deleted.
+
+### 2. Duplicate Orders
+**Allowed**: Multiple phases can have same order value. Frontend sorts by order, but behavior is deterministic (stable sort).
+
+### 3. Gaps in Order
+**Allowed**: Orders don't need to be consecutive (1, 2, 5, 10 is valid).
+
+### 4. Date Overlap
+**Allowed**: Phases can overlap in dates. No validation prevents this.
+
+### 5. Negative Order
+**Not Allowed**: Validation requires `order >= 0`.
+
+### 6. Missing Order
+**Handled**: Backend auto-calculates next available order.
+
+---
+
+## Future Enhancements
+
+- [ ] Drag-and-drop reordering
+- [ ] Bulk phase operations
+- [ ] Phase templates
+- [ ] Gantt chart visualization
+- [ ] Phase dependencies
+- [ ] Progress tracking (% complete)
+- [ ] Phase milestones
+- [ ] Phase duration calculation
+- [ ] Auto-status updates based on dates
+- [ ] Phase notifications/reminders

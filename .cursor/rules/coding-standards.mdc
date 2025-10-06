@@ -1,6 +1,13 @@
+---
+title: 
+description: 
+globs: 
+alwaysApply: true
+---
+
 # Coding Principles
 
-*Modeled on the “Clean Code” philosophy popularised by Robert C. Martin and widely adopted across the industry.*
+*Modeled on the "Clean Code" philosophy popularised by Robert C. Martin and widely adopted across the industry.*
 
 This document defines the core coding principles that every contributor **MUST** follow when working on **Project Metrics Tool**.  The goals are the same for every code change:
 
@@ -15,14 +22,14 @@ Following these principles keeps development velocity high and prevents _technic
 
 ## 1  General Philosophy
 
-> *“Clean code always looks like it was written by someone who cares.”*  — Michael Feathers
+> *"Clean code always looks like it was written by someone who cares."*  — Michael Feathers
 
 1.  **Leave the campground cleaner than you found it.**  Whenever you touch a file, take the extra minute to improve its clarity.
 2.  **Boy-Scout Rule.**  Small, incremental clean-ups are better than large refactors done rarely.
 3.  **Small Steps.**  Make frequent, small, atomic commits.  Each commit should pass all tests.
-4.  **YAGNI.**  Don’t add functionality until it is _actually_ needed.
+4.  **YAGNI.**  Don't add functionality until it is _actually_ needed.
 5.  **KISS.**  Prefer the simplest solution that satisfies the requirements—avoid cleverness.
-6.  **Fail Fast & Loud.**  Let errors surface early; don’t hide them.
+6.  **Fail Fast & Loud.**  Let errors surface early; don't hide them.
 
 ---
 
@@ -33,10 +40,10 @@ Following these principles keeps development velocity high and prevents _technic
 | `d` | `days_since_start` |
 | `calculate` | `compute_average_velocity` |
 
-1.  Use **intention-revealing names**.  The reader should not need additional context to grasp a symbol’s purpose.
+1.  Use **intention-revealing names**.  The reader should not need additional context to grasp a symbol's purpose.
 2.  **Pronounceable & searchable.**  Names appear in conversations, code reviews and grep searches.
 3.  **Avoid prefixes and Hungarian notation** (`strName`, `iCount`).  Let the type system and context speak for themselves.
-4.  Use **domain language** where appropriate—e.g., “sprint”, “issue”, “cycle time”.
+4.  Use **domain language** where appropriate—e.g., "sprint", "issue", "cycle time".
 
 ---
 
@@ -58,8 +65,8 @@ The **SOLID** principles are five foundational guidelines for designing maintain
 > *A module, class, or function should have one, and only one, reason to change.*
 
 - Each class or function should encapsulate a single concept or responsibility.
-- If you find yourself adding “and” or “or” to a function’s description, split it up.
-- Example: Don’t mix data parsing and validation in the same function.
+- If you find yourself adding "and" or "or" to a function's description, split it up.
+- Example: Don't mix data parsing and validation in the same function.
 
 **O** – *Open/Closed Principle (OCP)*  
 > *Software entities should be open for extension, but closed for modification.*
@@ -80,7 +87,7 @@ The **SOLID** principles are five foundational guidelines for designing maintain
 
 - Prefer small, focused interfaces or protocols over large, monolithic ones.
 - Split up classes/interfaces if they grow too many unrelated methods.
-- Example: Separate “export” and “import” interfaces if not all data sources support both.
+- Example: Separate "export" and "import" interfaces if not all data sources support both.
 
 **D** – *Dependency Inversion Principle (DIP)*  
 > *Depend on abstractions, not on concrete implementations.*
@@ -90,9 +97,9 @@ The **SOLID** principles are five foundational guidelines for designing maintain
 - Example: Pass a logger or HTTP client as a parameter, not as a hardcoded global.
 
 **How to apply SOLID in this project:**
-- When adding new features, ask: “Am I violating any SOLID principle?”
+- When adding new features, ask: "Am I violating any SOLID principle?"
 - Refactor code that mixes responsibilities or is hard to extend.
-- Use Python’s abstract base classes, protocols, or duck typing to define clear contracts.
+- Use Python's abstract base classes, protocols, or duck typing to define clear contracts.
 - Keep interfaces and classes focused and minimal.
 - Prefer composition and dependency injection over hardcoded dependencies.
 
@@ -103,7 +110,7 @@ For more, see: [SOLID Principles Wikipedia](https://en.wikipedia.org/wiki/SOLID)
 
 ## 5  Comments
 
-1.  **Code should explain *what*, comments explain *why*.**  Don’t restate the obvious.
+1.  **Code should explain *what*, comments explain *why*.**  Don't restate the obvious.
 2.  **Keep comments up-to-date** or delete them.
 3.  Always document public modules / classes using format proper for the language used  
 4.  Write TODOs in the form `# TODO(username): <action> <context>` and create a matching task in /tasks folder
@@ -115,7 +122,7 @@ For more, see: [SOLID Principles Wikipedia](https://en.wikipedia.org/wiki/SOLID)
 1.  **Exceptions over sentinel values.**  Never return `None`/`-1` to indicate errors.
 2.  **Provide context** in exception messages (identifiers, parameters, environment details).
 3.  **Fail early**, validate arguments at the boundary.
-4.  **Don’t catch what you can’t handle.**  Let it bubble up.
+4.  **Don't catch what you can't handle.**  Let it bubble up.
 5.  **NEVER return raw object from internal scope of function - like http results** if error occurs - throw exception instead of returning respo
 
 ---
@@ -123,9 +130,9 @@ For more, see: [SOLID Principles Wikipedia](https://en.wikipedia.org/wiki/SOLID)
 ## 7  Data & Control Structures
 
 1.  **Prefer composition over inheritance.**  Use mixins/delegation to share behaviour.
-2.  Stick to **standard library containers** (e.g., lists, dictionaries, sets) unless there’s a clear benefit.
+2.  Stick to **standard library containers** (e.g., lists, dictionaries, sets) unless there's a clear benefit.
 3.  Expose behaviour through methods, **not through public attributes**.
-4.  Don’t expose mutable internals; return copies or iterators.
+4.  Don't expose mutable internals; return copies or iterators.
 
 ---
 
@@ -157,4 +164,3 @@ Before approving a pull request, ensure:
 ---
 
 *Last updated: <!-- YYYY-MM-DD; keep ISO 8601 format --> 2025-08-04
-

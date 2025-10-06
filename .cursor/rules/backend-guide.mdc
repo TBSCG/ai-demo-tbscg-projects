@@ -1,0 +1,695 @@
+---
+title: 
+description: 
+globs: ["backend/**/*"]
+alwaysApply: false
+---
+
+# Backend Architecture Guide
+**Project Management Web Application - Express Backend**
+
+---
+
+## Technology Stack
+
+- **Runtime**: Node.js (LTS 22.18.0)
+- **Framework**: Express.js 5.0.0
+- **Language**: TypeScript 5.9
+- **Database**: PostgreSQL 18.0
+- **ORM**: Drizzle ORM (latest)
+- **Validation**: Zod (schema validation)
+- **Package Manager**: NPM
+
+---
+
+## Project Structure
+
+```
+backend/
+├── src/
+│   ├── db/
+│   │   ├── config.ts           # Database connection
+│   │   ├── schema.ts           # Drizzle schema definitions
+│   │   ├── migrate.ts          # Migration runner
+│   │   ├── seed.ts             # Seed data script
+│   │   ├── migrations/         # Generated SQL migrations
+│   │   └── queries/            # Database query functions
+│   │       ├── projects.queries.ts
+│   │       ├── phases.queries.ts
+│   │       └── index.ts
+│   ├── controllers/
+│   │   └── projects.controller.ts   # Business logic
+│   ├── routes/
+│   │   └── projects.routes.ts       # API route definitions
+│   ├── middleware/
+│   │   ├── errorHandler.ts          # Global error handler
+│   │   ├── notFound.ts              # 404 handler
+│   │   └── validateRequest.ts       # Zod validation
+│   ├── validators/
+│   │   ├── project.validator.ts     # Project schemas
+│   │   └── phase.validator.ts       # Phase schemas
+│   ├── utils/
+│   │   ├── errors.ts                # Custom error classes
+│   │   ├── asyncHandler.ts          # Async error wrapper
+│   │   └── logger.ts                # Request logger
+│   └── server.ts                    # Express app setup
+├── dist/                            # Compiled JavaScript
+├── drizzle.config.ts                # Drizzle Kit configuration
+├── .env                             # Environment variables
+└── tsconfig.json                    # TypeScript config
+```
+
+---
+
+## Architecture Layers
+
+### 1. Database Layer (`db/`)
+
+**Purpose**: Database connection, schema, migrations, and query functions
+
+**Key Files**:
+- `config.ts` - PostgreSQL connection using `node-postgres`
+- `schema.ts` - Drizzle ORM schema definitions
+- `migrate.ts` - Run migrations programmatically
+- `seed.ts` - Insert initial data
+- `queries/` - Reusable query functions
+
+**Database Schema**:
+```typescript
+// Projects table
+{
+  id: uuid (PK)
+  title: varchar(255) NOT NULL
+  client: varchar(255) NOT NULL
+  description: text
+  startDate: date
+  endDate: date
+  projectManager: varchar(255)
+  members: jsonb (array of strings)
+  createdAt: timestamp
+  updatedAt: timestamp
+}
+
+// Phases table
+{
+  id: uuid (PK)
+  projectId: uuid (FK -> projects.id, CASCADE)
+  name: varchar(255) NOT NULL
+  description: text
+  startDate: date
+  endDate: date
+  status: varchar(50) (planned|in-progress|completed)
+  order: integer NOT NULL
+  createdAt: timestamp
+}
+```
+
+**Query Functions Pattern**:
+```typescript
+// queries/projects.queries.ts
+export async function getAllProjectsWithPhases() {
+  return await db
+    .select()
+    .from(projects)
+    .orderBy(desc(projects.updatedAt));
+}
+
+export async function getProjectByIdWithPhases(projectId: string) {
+  const project = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  
+  if (!project.length) return null;
+  
+  const projectPhases = await db
+    .select()
+    .from(phases)
+    .where(eq(phases.projectId, projectId))
+    .orderBy(asc(phases.order));
+  
+  return { ...project[0], phases: projectPhases };
+}
+```
+
+### 2. Controller Layer (`controllers/`)
+
+**Purpose**: Business logic, data validation, and orchestration
+
+**Pattern**:
+- Import query functions from `db/queries`
+- Validate business rules
+- Call database queries
+- Transform data if needed
+- Return formatted response
+- Throw custom errors for failure cases
+
+**Example Controller**:
+```typescript
+export const getProjectById = asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const project = await getProjectByIdWithPhases(id);
+
+  if (!project) {
+    throw new NotFoundError('Project not found');
+  }
+
+  res.status(200).json({
+    success: true,
+    data: project,
+  });
+});
+```
+
+**All Controllers**:
+1. `getAllProjects` - GET /api/projects
+2. `getProjectById` - GET /api/projects/:id
+3. `createProject` - POST /api/projects
+4. `updateProject` - PUT /api/projects/:id
+5. `deleteProject` - DELETE /api/projects/:id
+6. `addPhase` - POST /api/projects/:id/phases
+7. `updatePhase` - PUT /api/projects/:id/phases/:phaseId
+8. `deletePhase` - DELETE /api/projects/:id/phases/:phaseId
+
+### 3. Routes Layer (`routes/`)
+
+**Purpose**: Define API endpoints and apply middleware
+
+**Pattern**:
+```typescript
+router.route('/path')
+  .get(validateRequest(schema), asyncHandler(controller))
+  .post(validateRequest(schema), asyncHandler(controller));
+```
+
+**Route Definitions**:
+```
+GET    /api/projects           - List all projects
+POST   /api/projects           - Create project
+GET    /api/projects/:id       - Get project by ID
+PUT    /api/projects/:id       - Update project
+DELETE /api/projects/:id       - Delete project
+POST   /api/projects/:id/phases           - Add phase
+PUT    /api/projects/:id/phases/:phaseId  - Update phase
+DELETE /api/projects/:id/phases/:phaseId  - Delete phase
+```
+
+### 4. Middleware Layer (`middleware/`)
+
+**Types**:
+
+**1. Request Validation** (`validateRequest.ts`):
+- Uses Zod schemas
+- Validates `req.body`, `req.query`, `req.params`
+- Throws `BadRequestError` on failure
+- Transforms Zod errors to readable format
+
+**2. Error Handler** (`errorHandler.ts`):
+- Global error handler (must be last)
+- Catches all errors from routes/middleware
+- Returns consistent JSON error response
+- Logs errors to console
+- Includes stack trace in development
+
+**3. Not Found Handler** (`notFound.ts`):
+- Catches requests to undefined routes
+- Throws `NotFoundError`
+- Applied after all routes
+
+**4. Request Logger** (`utils/logger.ts`):
+- Logs all incoming requests
+- Format: `[timestamp] METHOD URL - STATUS - DURATIONms`
+- Measures response time
+
+### 5. Validation Layer (`validators/`)
+
+**Purpose**: Zod schemas for request validation
+
+**Project Validator** (`project.validator.ts`):
+```typescript
+const projectSchema = z.object({
+  title: z.string().min(1).max(255),
+  client: z.string().min(1).max(255),
+  description: z.string().max(5000).nullable().optional(),
+  startDate: z.string().refine(isValidDate).nullable().optional(),
+  endDate: z.string().refine(isValidDate).nullable().optional(),
+  projectManager: z.string().max(255).nullable().optional(),
+  members: z.array(z.string()).nullable().optional().default([]),
+});
+
+export const createProjectSchema = z.object({
+  body: projectSchema,
+}).refine(endDateAfterStartDate);
+
+export const updateProjectSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+  body: projectSchema.partial(),
+}).refine(endDateAfterStartDate);
+```
+
+**Phase Validator** (`phase.validator.ts`):
+- Similar pattern to project validator
+- Validates phase-specific fields
+- Status enum: 'planned' | 'in-progress' | 'completed'
+- Order must be non-negative integer
+
+### 6. Utilities Layer (`utils/`)
+
+**Custom Errors** (`errors.ts`):
+```typescript
+class ApiError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+  details?: Record<string, any>;
+}
+
+class BadRequestError extends ApiError {
+  constructor(message, details) {
+    super(message, 400, details);
+  }
+}
+
+class NotFoundError extends ApiError {
+  constructor(message, details) {
+    super(message, 404, details);
+  }
+}
+```
+
+**Async Handler** (`asyncHandler.ts`):
+- Wraps async route handlers
+- Catches errors and passes to next()
+- Eliminates try-catch in every controller
+
+```typescript
+export const asyncHandler = (fn: AsyncHandlerFunction) =>
+  (req, res, next) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+```
+
+---
+
+## Database Operations
+
+### Drizzle ORM Patterns
+
+**Select**:
+```typescript
+const results = await db
+  .select()
+  .from(table)
+  .where(eq(table.column, value))
+  .orderBy(asc(table.column))
+  .limit(10);
+```
+
+**Insert**:
+```typescript
+const [created] = await db
+  .insert(table)
+  .values({ ...data })
+  .returning();
+```
+
+**Update**:
+```typescript
+const [updated] = await db
+  .update(table)
+  .set({ ...updates, updatedAt: new Date() })
+  .where(eq(table.id, id))
+  .returning();
+```
+
+**Delete**:
+```typescript
+const [deleted] = await db
+  .delete(table)
+  .where(eq(table.id, id))
+  .returning();
+```
+
+**Joins**:
+```typescript
+const results = await db
+  .select()
+  .from(projects)
+  .leftJoin(phases, eq(phases.projectId, projects.id));
+```
+
+### Migration Workflow
+
+**Generate Migration**:
+```bash
+npm run db:generate
+```
+Creates migration file in `src/db/migrations/`
+
+**Run Migrations**:
+```bash
+npm run db:migrate
+```
+Applies all pending migrations
+
+**Push Schema** (dev only):
+```bash
+npm run db:push
+```
+Sync schema directly without migrations
+
+**Seed Database**:
+```bash
+npm run db:seed
+```
+Insert sample data from `seed.ts`
+
+### Schema Design Principles
+
+1. **UUID Primary Keys**: Use `uuid` type with `defaultRandom()`
+2. **Timestamps**: Always include `createdAt` and `updatedAt`
+3. **Foreign Keys**: Define with `references()` and cascade rules
+4. **Nullable Fields**: Use `.notNull()` only for required fields
+5. **JSON Fields**: Use `jsonb` for arrays and objects
+6. **Indexes**: Add on foreign keys and frequently queried columns
+7. **Constraints**: Define unique constraints and check constraints
+
+---
+
+## API Response Format
+
+### Success Response
+```typescript
+{
+  success: true,
+  data: <result> | <array>
+}
+```
+
+### Error Response
+```typescript
+{
+  success: false,
+  error: "Error message",
+  details: { field: "Error" },  // Optional, validation errors
+  stack: "..."                   // Only in development
+}
+```
+
+### HTTP Status Codes
+- `200 OK` - Successful GET, PUT
+- `201 Created` - Successful POST
+- `400 Bad Request` - Validation errors
+- `404 Not Found` - Resource not found
+- `500 Internal Server Error` - Unexpected errors
+
+---
+
+## Error Handling Strategy
+
+### 1. Validation Errors (400)
+```typescript
+throw new BadRequestError('Validation failed', {
+  title: 'Title is required',
+  client: 'Client is required',
+});
+```
+
+### 2. Not Found Errors (404)
+```typescript
+if (!project) {
+  throw new NotFoundError('Project not found');
+}
+```
+
+### 3. Unexpected Errors (500)
+Caught by global error handler, logged, and returned as generic error
+
+### 4. Database Errors
+- Caught and wrapped in custom error
+- Never expose raw database error to client
+- Log full error for debugging
+
+---
+
+## Environment Configuration
+
+**`.env` File**:
+```
+PORT=3000
+NODE_ENV=development
+DATABASE_URL=postgresql://localhost:5432/project_management_db
+FRONTEND_URL=http://localhost:5173
+```
+
+**Usage**:
+```typescript
+const PORT = process.env.PORT || 3000;
+const dbUrl = process.env.DATABASE_URL;
+```
+
+---
+
+## Server Setup and Middleware Order
+
+**Order is Critical**:
+```typescript
+// 1. CORS
+app.use(cors({ origin: process.env.FRONTEND_URL }));
+
+// 2. Body parsers
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 3. Request logger
+app.use(requestLogger);
+
+// 4. Routes
+app.get('/health', healthHandler);
+app.use('/api/projects', projectsRouter);
+
+// 5. 404 handler (after all routes)
+app.use(notFoundHandler);
+
+// 6. Error handler (last)
+app.use(errorHandler);
+```
+
+---
+
+## Database Query Patterns
+
+### Query Organization
+- One file per table: `projects.queries.ts`, `phases.queries.ts`
+- Export individual query functions
+- Re-export from `queries/index.ts`
+
+### Query Function Naming
+- `getAll{Entity}` - Get all records
+- `get{Entity}ById` - Get single by ID
+- `create{Entity}` - Insert new record
+- `update{Entity}` - Update existing record
+- `delete{Entity}` - Delete record
+- `{entity}Exists` - Check existence
+
+### Transaction Pattern
+```typescript
+await db.transaction(async (tx) => {
+  const project = await tx.insert(projects).values(data).returning();
+  await tx.insert(phases).values({ projectId: project[0].id, ... });
+});
+```
+
+### Error Handling in Queries
+```typescript
+export async function getProjectById(id: string) {
+  const results = await db
+    .select()
+    .from(projects)
+    .where(eq(projects.id, id))
+    .limit(1);
+  
+  return results.length > 0 ? results[0] : null;
+}
+```
+Return `null` for not found, let controller handle error
+
+---
+
+## TypeScript Configuration
+
+### Key Settings
+- `target: ES2022` - Modern JavaScript features
+- `module: ESNext` - ES modules
+- `moduleResolution: bundler` - Node16+ resolution
+- `strict: true` - All strict checks enabled
+- `noEmit: false` - Emit JS files to `dist/`
+- `outDir: ./dist` - Output directory
+
+### Path Aliases
+```typescript
+{
+  "baseUrl": ".",
+  "paths": {
+    "@demo-tbscg/shared": ["../shared/types/index.ts"]
+  }
+}
+```
+
+---
+
+## Development Workflow
+
+### Available Scripts
+```bash
+npm run dev           # Start dev server with nodemon
+npm run build         # Compile TypeScript to JavaScript
+npm run start         # Run compiled JavaScript
+npm run type-check    # Check types without emitting
+npm run db:generate   # Generate Drizzle migration
+npm run db:migrate    # Run migrations
+npm run db:push       # Push schema to DB (dev only)
+npm run db:seed       # Seed database with sample data
+npm run db:studio     # Open Drizzle Studio
+```
+
+### Development Server
+- Uses `nodemon` for auto-restart
+- Watches `.ts` files in `src/`
+- Compiles with `ts-node`
+
+---
+
+## Testing Strategy
+
+### Unit Tests (Query Functions)
+- Test each query function in isolation
+- Mock database connection
+- Verify SQL generation
+- Test error cases
+
+### Integration Tests (Controllers)
+- Test full request/response cycle
+- Use test database
+- Mock external dependencies
+- Verify status codes and response format
+
+### E2E Tests
+- Test complete API workflows
+- Create → Read → Update → Delete
+- Test cascading deletes
+- Test validation errors
+
+---
+
+## Performance Optimization
+
+### Database
+1. **Indexes**: Add on foreign keys and search columns
+2. **Limit Results**: Always paginate large result sets
+3. **Select Specific Columns**: Avoid `SELECT *` when not needed
+4. **Connection Pooling**: Configure max connections
+5. **Query Analysis**: Use `EXPLAIN ANALYZE` for slow queries
+
+### API
+1. **Caching**: Add Redis for frequently accessed data
+2. **Compression**: Enable gzip compression
+3. **Rate Limiting**: Implement to prevent abuse
+4. **Async Operations**: Keep all I/O async
+
+---
+
+## Security Best Practices
+
+### Input Validation
+- ✓ Validate all inputs with Zod
+- ✓ Sanitize user inputs
+- ✓ Validate UUID format for IDs
+- ✓ Limit string lengths
+- ✓ Validate date formats
+
+### SQL Injection Prevention
+- ✓ Use Drizzle ORM (parameterized queries)
+- ✗ Never concatenate user input into SQL
+
+### Error Handling
+- ✓ Hide internal errors from clients
+- ✓ Log full errors server-side
+- ✗ Don't expose stack traces in production
+
+### CORS
+- ✓ Configure allowed origins
+- ✗ Don't use `origin: '*'` in production
+
+---
+
+## Database Maintenance
+
+### Backup Strategy
+```bash
+# Backup database
+pg_dump -U postgres project_management_db > backup.sql
+
+# Restore database
+psql -U postgres project_management_db < backup.sql
+```
+
+### Migration Safety
+1. Always review generated migrations
+2. Test migrations on dev/staging first
+3. Backup production before migrating
+4. Plan rollback strategy
+5. Run during low-traffic periods
+
+---
+
+## Monitoring and Logging
+
+### Request Logging
+- All requests logged with: method, URL, status, duration
+- Format: `[ISO timestamp] METHOD URL - STATUS - DURATIONms`
+
+### Error Logging
+- All errors logged to console
+- Include: message, stack trace, request details
+- Future: Send to logging service (e.g., Sentry, LogRocket)
+
+### Health Check
+- Endpoint: `GET /health`
+- Returns server status and database connection status
+- Use for monitoring/uptime checks
+
+---
+
+## Common Issues and Solutions
+
+### Issue: Database connection fails
+**Solution**: Check PostgreSQL is running, verify DATABASE_URL, check firewall
+
+### Issue: Migration fails
+**Solution**: Check for conflicts, review migration SQL, check database state
+
+### Issue: CORS errors
+**Solution**: Verify FRONTEND_URL in .env, check CORS middleware order
+
+### Issue: Validation errors not showing
+**Solution**: Check Zod schema, verify validateRequest middleware applied
+
+### Issue: 500 errors not logged
+**Solution**: Check error handler is last middleware, verify error is thrown not returned
+
+---
+
+## Future Enhancements
+
+- [ ] Add authentication (JWT)
+- [ ] Implement authorization (role-based access)
+- [ ] Add pagination and filtering
+- [ ] Implement caching (Redis)
+- [ ] Add rate limiting
+- [ ] Implement file uploads (S3)
+- [ ] Add WebSocket support for real-time updates
+- [ ] Implement audit logging
+- [ ] Add API documentation (Swagger/OpenAPI)
+- [ ] Implement batch operations

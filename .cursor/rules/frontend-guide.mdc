@@ -1,0 +1,568 @@
+---
+title: 
+description: 
+globs: ["frontend/**/*"]
+alwaysApply: false
+---
+
+# Frontend Architecture Guide
+**Project Management Web Application - React Frontend**
+
+---
+
+## Technology Stack
+
+- **Framework**: React 19.1.1 with TypeScript 5.9
+- **Build Tool**: Vite 7.0
+- **Routing**: React Router DOM 7.1.3
+- **HTTP Client**: Axios 1.7.9
+- **Styling**: Tailwind CSS 3.4.11 + CSS Modules
+- **Linting**: ESLint 9.29.0
+- **Package Manager**: NPM
+
+---
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── api/              # API layer and HTTP clients
+│   ├── components/       # Reusable React components
+│   ├── pages/           # Route-level page components
+│   ├── hooks/           # Custom React hooks
+│   ├── utils/           # Utility functions
+│   ├── assets/          # Static assets (images, icons)
+│   ├── App.tsx          # Main app component with routing
+│   ├── main.tsx         # React app entry point
+│   └── index.css        # Global Tailwind CSS imports
+├── public/              # Public static files
+├── dist/                # Build output (generated)
+└── index.html           # HTML entry point
+```
+
+---
+
+## Core Architecture Patterns
+
+### 1. Component Organization
+
+**UI Components** (`components/ui/`):
+- Atomic, reusable components (Button, Input, Card, Modal, etc.)
+- Accept props for customization
+- No business logic, purely presentational
+- Styled with Tailwind CSS utility classes
+
+**Feature Components** (`components/`):
+- ProjectCard, PhaseTimeline, Layout
+- Combine UI components with specific business logic
+- Accept typed props from pages
+
+**Page Components** (`pages/`):
+- One per route
+- Handle data fetching and state management
+- Compose UI and feature components
+- Handle user interactions and navigation
+
+### 2. API Layer Architecture
+
+**Structure**:
+```
+api/
+├── client.ts       # Axios instance with interceptors
+├── projects.ts     # Project API methods
+├── index.ts        # Centralized exports
+├── mocks.ts        # Mock adapter (disabled in production)
+└── mockData.ts     # Mock data for development
+```
+
+**API Client Pattern**:
+- Base URL from environment variable: `VITE_API_BASE_URL`
+- Centralized error handling via interceptors
+- Request/response logging for debugging
+- Type-safe responses using shared types
+
+**Usage Example**:
+```typescript
+import { projectsApi } from '../api';
+
+const projects = await projectsApi.getAll();
+const project = await projectsApi.getById(id);
+const created = await projectsApi.create(data);
+```
+
+### 3. Routing Structure
+
+**Routes** (defined in `App.tsx`):
+- `/` - ProjectListPage (home)
+- `/projects/new` - NewProjectPage
+- `/projects/:id` - ProjectDetailPage
+- `/projects/:id/edit` - EditProjectPage
+- `*` - NotFoundPage (404)
+
+**Navigation Pattern**:
+- Use `useNavigate()` hook for programmatic navigation
+- Use `<Link>` component for declarative navigation
+- Pass state via `location.state` when needed
+
+---
+
+## Key Components Reference
+
+### Layout Component
+**Purpose**: Provides consistent header and navigation across all pages
+
+**Features**:
+- Sticky header with app title
+- Conditional back button (hidden on home page)
+- Max-width container for content
+- Consistent padding and styling
+
+### ProjectCard Component
+**Purpose**: Display project summary in grid view
+
+**Props**:
+- `project: Project` - Project data
+- `onClick: () => void` - Click handler
+
+**Displays**: Title, client, project manager, date range, member count
+
+### PhaseTimeline Component
+**Purpose**: Visual timeline of project phases
+
+**Props**:
+- `phases: Phase[]` - Array of phases
+
+**Features**:
+- Automatic sorting by order
+- Visual connector lines between phases
+- Status badges with color coding
+- Responsive layout
+
+### UI Component Library
+
+All UI components follow consistent patterns:
+- Accept `label`, `value`, `onChange`, `error` props
+- Display validation errors below input
+- Required fields marked with red asterisk
+- Consistent focus states using primary color
+
+**Available Components**:
+- `Button` - Multiple variants (primary, secondary, danger, ghost)
+- `Input` - Text input with label and error handling
+- `TextArea` - Multi-line text input
+- `DatePicker` - Date selection with native input
+- `Select` - Dropdown selection
+- `Badge` - Status/info pills
+- `Card` - Container with shadow and hover effects
+- `Modal` - Centered overlay dialog
+- `Spinner` - Loading indicator
+- `Alert` - Success/error/warning/info messages
+
+---
+
+## Pages Reference
+
+### ProjectListPage
+**Route**: `/`
+
+**Responsibilities**:
+- Fetch and display all projects
+- Grid layout (responsive: 1/2/3 columns)
+- Navigation to detail/create pages
+- Empty state when no projects
+- Error handling with retry
+
+**State Management**:
+- `projects` - Array of projects
+- `loading` - Loading state
+- `error` - Error message
+
+### ProjectDetailPage
+**Route**: `/projects/:id`
+
+**Responsibilities**:
+- Display full project information
+- Show project phases in timeline
+- Edit/delete action buttons
+- Delete confirmation modal
+
+**State Management**:
+- `project` - Project with phases
+- `loading` - Loading state
+- `error` - Error message
+- `isDeleteModalOpen` - Modal state
+- `deleting` - Delete operation state
+
+### EditProjectPage
+**Route**: `/projects/:id/edit`
+
+**Responsibilities**:
+- Load existing project data
+- Edit all project fields
+- Manage team members (add/remove)
+- Manage phases (create/update/delete)
+- Form validation
+- Save changes to API
+
+**Complex State**:
+- `project` - Original project data
+- `formData` - Form fields
+- `memberInput` - Temporary member input
+- `errors` - Validation errors
+- `phaseFormData` - Phase form in modal
+- `editingPhase` - Currently editing phase
+- `isPhaseModalOpen` - Phase modal state
+
+**Phase Management**:
+- Modal for create/edit phases
+- Inline phase list with edit/delete buttons
+- Auto-increment phase order
+
+### NewProjectPage
+**Route**: `/projects/new`
+
+**Responsibilities**:
+- Create new project form
+- Validate required fields
+- Add/remove team members
+- Submit to API
+- Navigate to new project on success
+
+**Validation Rules**:
+- Title: required, non-empty
+- Client: required, non-empty
+- End date must be after start date
+
+---
+
+## State Management Patterns
+
+### Local Component State
+Uses React's `useState` for:
+- Form inputs
+- Loading states
+- Error messages
+- Modal open/close states
+- Temporary UI state
+
+### Async Data Fetching Pattern
+```typescript
+const [data, setData] = useState<Type | null>(null);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState<string | null>(null);
+
+useEffect(() => {
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await api.getData();
+      setData(result);
+    } catch (err) {
+      setError('Error message');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+  loadData();
+}, [dependency]);
+```
+
+### Form Handling Pattern
+```typescript
+const [formData, setFormData] = useState<FormType>({...});
+const [errors, setErrors] = useState<Record<string, string>>({});
+
+const validate = (): boolean => {
+  const newErrors: Record<string, string> = {};
+  if (!formData.field) newErrors.field = 'Error message';
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!validate()) return;
+  // Submit logic
+};
+```
+
+---
+
+## Styling Conventions
+
+### Tailwind CSS Usage
+- **Primary Color**: `#ff8204` (orange) - defined in tailwind.config.js
+- **Color Scale**: primary-50 through primary-900
+- **Spacing**: Use Tailwind spacing scale (4, 6, 8, etc.)
+- **Breakpoints**: sm, md, lg, xl (mobile-first)
+
+### Common Patterns
+```typescript
+// Card with hover effect
+className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+
+// Primary button
+className="bg-primary text-white hover:bg-primary-600 transition-colors"
+
+// Input field
+className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary"
+
+// Grid layout
+className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+```
+
+### CSS Modules
+- Use for component-specific styles
+- Name files: `Component.module.css`
+- Import: `import styles from './Component.module.css'`
+- Apply: `className={styles.className}`
+
+---
+
+## Type Safety
+
+### Shared Types
+Import from `@demo-tbscg/shared` package:
+- `Project` - Project entity
+- `Phase` - Phase entity
+- `CreateProjectDto` - Project creation data
+- `UpdateProjectDto` - Project update data
+- `CreatePhaseDto` - Phase creation data
+- `UpdatePhaseDto` - Phase update data
+- `ApiResponse<T>` - API response wrapper
+
+### Type Inference
+Use TypeScript's type inference where possible:
+```typescript
+const [projects, setProjects] = useState<Project[]>([]);
+const project = await projectsApi.getById(id); // Type inferred
+```
+
+---
+
+## Error Handling
+
+### API Error Handling
+1. **Try-Catch Blocks**: Wrap all API calls
+2. **User-Friendly Messages**: Don't expose technical details
+3. **Console Logging**: Log full error for debugging
+4. **Error State**: Store in component state
+5. **Alert Component**: Display to user with dismiss option
+
+### Validation Error Handling
+1. **Client-Side Validation**: Before API call
+2. **Field-Level Errors**: Store per field
+3. **Display Inline**: Show below input
+4. **Prevent Submission**: Return early if invalid
+
+---
+
+## Performance Considerations
+
+### Code Splitting
+- Vite automatically splits code by route
+- Lazy load heavy components if needed
+
+### Memo and Callbacks
+- Use `useMemo` for expensive computations
+- Use `useCallback` for stable function references
+- Avoid premature optimization
+
+### Image Optimization
+- Use appropriate formats (WebP, PNG, SVG)
+- Provide width/height attributes
+- Lazy load images below fold
+
+---
+
+## Development Workflow
+
+### Available Scripts
+```bash
+npm run dev         # Start dev server (port 5173)
+npm run build       # Build for production
+npm run preview     # Preview production build
+npm run lint        # Run ESLint
+npm run type-check  # TypeScript type checking
+```
+
+### Environment Variables
+Create `.env` file:
+```
+VITE_API_BASE_URL=http://localhost:3000
+```
+
+Access in code:
+```typescript
+import.meta.env.VITE_API_BASE_URL
+```
+
+### Mock vs Real API
+- **Mocks Disabled**: Comment in `src/api/index.ts` removed
+- **Real API**: Points to `http://localhost:3000`
+- **Toggle**: Comment/uncomment mock import
+
+---
+
+## Common Patterns and Best Practices
+
+### 1. Component File Structure
+```typescript
+// Imports
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { Project } from '@demo-tbscg/shared';
+
+// Types/Interfaces
+interface Props {
+  project: Project;
+}
+
+// Component
+export default function Component({ project }: Props) {
+  // State
+  const [state, setState] = useState<Type>(initial);
+  
+  // Hooks
+  const navigate = useNavigate();
+  
+  // Handlers
+  const handleClick = () => {};
+  
+  // Effects
+  useEffect(() => {}, []);
+  
+  // Render
+  return <div></div>;
+}
+```
+
+### 2. Conditional Rendering
+```typescript
+// Loading state
+if (loading) return <Spinner />;
+
+// Error state
+if (error) return <Alert variant="error">{error}</Alert>;
+
+// Empty state
+if (data.length === 0) return <EmptyState />;
+
+// Conditional display
+{condition && <Component />}
+{condition ? <ComponentA /> : <ComponentB />}
+```
+
+### 3. List Rendering
+```typescript
+{items.map((item) => (
+  <Component key={item.id} item={item} />
+))}
+```
+
+### 4. Form Input Patterns
+```typescript
+// Controlled input
+<Input
+  value={formData.field}
+  onChange={(value) => setFormData({ ...formData, field: value })}
+/>
+
+// Nullable date
+<DatePicker
+  value={formData.date ?? null}
+  onChange={(value) => setFormData({ ...formData, date: value })}
+/>
+
+// Array of members
+const handleAdd = () => {
+  setFormData({
+    ...formData,
+    members: [...(formData.members || []), newMember]
+  });
+};
+```
+
+---
+
+## Utility Functions
+
+### Date Formatting (`utils/dateFormat.ts`)
+- `formatDate(dateString)` - Short format: "Jan 1, 2025"
+- `formatDateLong(dateString)` - Long format: "January 1, 2025"
+- `formatDateRange(start, end)` - Range: "Jan 1 - Dec 31, 2025"
+
+All functions handle null/invalid dates gracefully.
+
+---
+
+## Accessibility
+
+### Keyboard Navigation
+- All interactive elements focusable
+- Modal closes on Escape key
+- Enter key submits forms
+
+### ARIA Labels
+- `aria-label` on icon buttons
+- `role` attributes on clickable divs
+- `sr-only` class for screen reader text
+
+### Color Contrast
+- Text meets WCAG AA standards
+- Primary color contrast validated
+- Error/success states clearly distinguishable
+
+---
+
+## Testing Considerations
+
+### Manual Testing Checklist
+- ✓ Create new project
+- ✓ Edit existing project
+- ✓ Delete project (with confirmation)
+- ✓ Add/edit/delete phases
+- ✓ Form validation (required fields)
+- ✓ Date validation (end after start)
+- ✓ Navigation (back button, routes)
+- ✓ Error handling (network failures)
+- ✓ Empty states
+- ✓ Loading states
+
+### Future Testing Setup
+- Jest for unit tests
+- React Testing Library for component tests
+- Cypress/Playwright for E2E tests
+
+---
+
+## Common Issues and Solutions
+
+### Issue: API calls failing
+**Solution**: Check backend server is running on port 3000, verify CORS settings
+
+### Issue: TypeScript errors on shared types
+**Solution**: Ensure `@demo-tbscg/shared` path alias in tsconfig.app.json is correct
+
+### Issue: Tailwind classes not applying
+**Solution**: Check class names are in content array in tailwind.config.js
+
+### Issue: Hot reload not working
+**Solution**: Restart dev server, check file watchers aren't exhausted
+
+---
+
+## Future Enhancements
+
+- [ ] Add search/filter functionality
+- [ ] Implement sorting options
+- [ ] Add project templates
+- [ ] Implement user authentication
+- [ ] Add dark mode support
+- [ ] Implement drag-and-drop for phases
+- [ ] Add export functionality (PDF/CSV)
+- [ ] Implement real-time updates (WebSocket)
+- [ ] Add file attachment support

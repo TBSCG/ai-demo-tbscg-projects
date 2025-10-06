@@ -1,0 +1,12 @@
+When I ask you to document, keep in mind the following information:
+- All documentation should be written as Cursor rules
+- Cursor rules are stored in the `.cursor/rules` directory
+- Cursor rules have a `.mdc` file extension
+- Cursor rules have a `title` and `description` field
+- Cursor rules have a `globs` field that specifies which files to apply to
+- Cursor rules have an `alwaysApply` field that specifies whether to apply the rule to all files
+- Each file can have 1 of 4 types of triggers to be included in an agent conversation
+    - Always apply: alwaysApply should be set to true. title, description and globs should be left empty
+    - Apply intellegently: the doc file will be applied on conversations that match the topic described in the description field. For this type, alwaysApply should be set to false. title, description should be filled out, but globs should be left empty.
+    - Apply on specific files: the doc file will be applied on conversations that match the files specified in the globs field. For this type, alwaysApply should be set to false. title, description should not be filled out, but globs should be filled out.
+    - Apply manually: the doc file can only be applied manually by the user in the conversation. For this type, alwaysApply should be set to false. title, description and globs should be left empty.

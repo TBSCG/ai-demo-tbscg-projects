@@ -1,3 +1,10 @@
+---
+title: 
+description: 
+globs: 
+alwaysApply: true
+---
+
 # API Specification
 ## Project Management REST API
 
@@ -469,5 +476,3 @@ curl -X POST http://localhost:3000/api/projects/[project-id]/phases \
 - The `members` field is stored as a JSON array of strings
 - Phases are returned with the project in GET /api/projects/:id
 - Deleting a project cascades to delete all its phases
-
-
