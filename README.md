@@ -1,6 +1,6 @@
 # Project Management Web Application
 
-![Backend Tests](https://github.com/YOUR_USERNAME/demo-tbscg-projects/actions/workflows/backend-tests.yml/badge.svg)
+![Backend Tests](https://github.com/TBSCG/ai-demo-tbscg-projects/actions/workflows/backend-tests.yml/badge.svg)
 
 A modern web application for organizing and managing projects with detailed information, roadmaps, and team members.
 
